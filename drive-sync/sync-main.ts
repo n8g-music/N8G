@@ -44,7 +44,7 @@ function log(message: string) {
  */
 export async function runFullSync(dryRun: boolean = false): Promise<void> {
   const state = loadSyncState();
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
 
   if (!drive) {
     log("Drive client not available — skipping sync");

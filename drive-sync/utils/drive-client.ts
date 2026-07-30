@@ -8,12 +8,27 @@
  * - Checking for changes since last sync
  */
 
-import { google, drive_v3 } from "googleapis";
 import * as fs from "fs";
 import * as path from "path";
 import { CREDENTIALS_PATH, SYNC_STATE_PATH, SyncState } from "../config";
 
-let driveClient: drive_v3.Drive | null = null;
+// Lazy-loaded googleapis — avoids crash when the package isn't installed
+let driveClient: any = null;
+let googleModule: any = null;
+
+async function loadGoogleApis(): Promise<boolean> {
+  if (googleModule) return true;
+  try {
+    // Construct module name at runtime so Bun doesn't pre-resolve
+    const pkg = ["goo", "gle", "apis"].join("");
+    googleModule = await import(pkg);
+    return true;
+  } catch {
+    log("ERROR: googleapis package not installed. Run: bun add googleapis");
+    log("  (Note: googleapis is ~200MB — ensure sufficient disk space)");
+    return false;
+  }
+}
 
 /**
  * Log message with timestamp to stdout (captured by log file).
@@ -58,15 +73,19 @@ export function loadCredentials(): { client_email: string; private_key: string }
 
 /**
  * Initialize and return an authenticated Drive client.
- * Returns null if credentials are missing/invalid.
+ * Returns null if credentials are missing/invalid or googleapis isn't installed.
  */
-export function getDriveClient(): drive_v3.Drive | null {
+export async function getDriveClient(): Promise<any | null> {
   if (driveClient) return driveClient;
 
   const creds = loadCredentials();
   if (!creds) return null;
 
+  const loaded = await loadGoogleApis();
+  if (!loaded) return null;
+
   try {
+    const { google } = googleModule;
     const auth = new google.auth.JWT({
       email: creds.client_email,
       key: creds.private_key,
@@ -93,8 +112,8 @@ export function getDriveClient(): drive_v3.Drive | null {
 export async function listFilesInFolder(
   folderName: string,
   pageToken?: string
-): Promise<{ files: drive_v3.Schema$File[]; nextPageToken?: string }> {
-  const drive = getDriveClient();
+): Promise<{ files: any[]; nextPageToken?: string }> {
+  const drive = await getDriveClient();
   if (!drive) throw new Error("Drive client not initialized");
 
   // First, find the folder by name in the shared drive / root
@@ -132,7 +151,7 @@ export async function downloadFile(
   fileId: string,
   localPath: string
 ): Promise<void> {
-  const drive = getDriveClient();
+  const drive = await getDriveClient();
   if (!drive) throw new Error("Drive client not initialized");
 
   const dir = path.dirname(localPath);
@@ -164,8 +183,8 @@ export async function downloadFile(
  */
 export async function getFileMetadata(
   fileId: string
-): Promise<drive_v3.Schema$File | null> {
-  const drive = getDriveClient();
+): Promise<any | null> {
+  const drive = await getDriveClient();
   if (!drive) throw new Error("Drive client not initialized");
 
   try {
@@ -208,10 +227,10 @@ export function saveSyncState(state: SyncState): void {
  * Compares by modifiedTime using the stored state.
  */
 export function findChangedFiles(
-  files: drive_v3.Schema$File[],
+  files: any[],
   folderName: string,
   state: SyncState
-): drive_v3.Schema$File[] {
+): any[] {
   const folderState = state[folderName];
   if (!folderState || !folderState.lastChecked) {
     // First sync — all files are new
