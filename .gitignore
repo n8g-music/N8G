@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Vercel
+.vercel/
+
+# Runtime
+.run/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+
+# PID files
+*.pid
+
+# Environment
+.env
+.env.local
+.env*.local
+
+# Turbo
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts

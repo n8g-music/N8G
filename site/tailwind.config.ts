@@ -1,0 +1,137 @@
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  content: [
+    "./src/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        copper: {
+          50: "#FDF8F3",
+          100: "#F9E8D8",
+          200: "#F0CDAD",
+          300: "#E5A971",
+          400: "#D98B45",
+          500: "#B87333",
+          600: "#9E5E27",
+          700: "#824A1F",
+          800: "#663818",
+          900: "#4A2811",
+          950: "#2E180A",
+        },
+        charcoal: {
+          50: "#F0F0F0",
+          100: "#D9D9D9",
+          200: "#B3B3B3",
+          300: "#8C8C8C",
+          400: "#666666",
+          500: "#404040",
+          600: "#262626",
+          700: "#1A1A1A",
+          800: "#141414",
+          900: "#0D0D0D",
+          950: "#080808",
+        },
+        clay: {
+          DEFAULT: "#A0522D",
+          50: "#FDF8F6",
+          100: "#F5E3D8",
+          200: "#E6C2AE",
+          300: "#D69C7D",
+          400: "#C0704D",
+          500: "#A0522D",
+          600: "#814222",
+          700: "#613119",
+          800: "#402010",
+          900: "#201008",
+        },
+        stone: {
+          DEFAULT: "#8B8581",
+          50: "#F5F4F3",
+          100: "#E8E6E4",
+          200: "#D1CECA",
+          300: "#BAB5B0",
+          400: "#A39D97",
+          500: "#8B8581",
+          600: "#6F6A67",
+          700: "#53504D",
+          800: "#373533",
+          900: "#1C1A19",
+        },
+        sand: {
+          DEFAULT: "#D4C5A9",
+          50: "#FBF9F6",
+          100: "#F4EFE5",
+          200: "#E9DFCB",
+          300: "#DFCEB2",
+          400: "#D4C5A9",
+          500: "#B8A585",
+          600: "#9C8765",
+          700: "#7A6849",
+          800: "#57482F",
+          900: "#332A18",
+        },
+        linen: {
+          DEFAULT: "#F5F0E8",
+          50: "#FDFCFB",
+          100: "#FBF8F4",
+          200: "#F7F2E9",
+          300: "#F5F0E8",
+          400: "#EBE0CD",
+          500: "#E0D0B2",
+          600: "#D5C097",
+          700: "#C4A870",
+          800: "#A8894A",
+          900: "#7D6535",
+        },
+        background: "#1A1A1A",
+        surface: "#C4B7A6",
+        "text-primary": "#F5F0E8",
+        "text-secondary": "#C4B7A6",
+      },
+      fontFamily: {
+        sans: ["Inter", "system-ui", "sans-serif"],
+        serif: ["Playfair Display", "Georgia", "serif"],
+        mono: ["JetBrains Mono", "monospace"],
+      },
+      animation: {
+        "pulse-copper": "pulseCopper 3s ease-in-out infinite",
+        "fade-in": "fadeIn 0.6s ease-out forwards",
+        "slide-up": "slideUp 0.6s ease-out forwards",
+        "copper-glow": "copperGlow 4s ease-in-out infinite",
+      },
+      keyframes: {
+        pulseCopper: {
+          "0%, 100%": {
+            boxShadow: "0 0 0 0 rgba(184, 115, 51, 0.4)",
+          },
+          "50%": {
+            boxShadow: "0 0 0 8px rgba(184, 115, 51, 0)",
+          },
+        },
+        fadeIn: {
+          from: { opacity: "0", transform: "translateY(10px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        slideUp: {
+          from: { opacity: "0", transform: "translateY(30px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        copperGlow: {
+          "0%, 100%": { opacity: "0.4" },
+          "50%": { opacity: "0.8" },
+        },
+      },
+      backdropBlur: {
+        xs: "2px",
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;

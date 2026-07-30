@@ -1,0 +1,36 @@
+{
+  "name": "n8g-site",
+  "private": true,
+  "sideEffects": false,
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_PATH=/tmp/n8g-node-modules next dev --port 3000 -H 0.0.0.0",
+    "build": "NODE_PATH=/tmp/n8g-node-modules next build",
+    "start": "NODE_PATH=/tmp/n8g-node-modules next start --port 3000 -H 0.0.0.0",
+    "publish": "bash ./publish.sh",
+    "watch": "NODE_PATH=/tmp/n8g-node-modules bun run scripts/watch-content.ts",
+    "go-live": "bash ./go-live.sh",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@vercel/analytics": "^1.4.1",
+    "framer-motion": "^11.15.0",
+    "gray-matter": "^4.0.3",
+    "next": "^14.2.21",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "prettier": "^3.4.2",
+    "tailwindcss": "^3.4.16",
+    "typescript": "^5.7.2"
+  }
+}

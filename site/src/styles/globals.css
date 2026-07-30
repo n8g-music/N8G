@@ -1,0 +1,166 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== Typography ===== */
+@layer base {
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sans text-text-primary;
+  }
+
+  h1 {
+    @apply text-4xl md:text-5xl lg:text-6xl font-light tracking-wide uppercase;
+  }
+
+  h2 {
+    @apply text-3xl md:text-4xl font-normal uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  h3 {
+    @apply text-2xl md:text-3xl font-medium;
+    letter-spacing: 0.02em;
+  }
+
+  h4 {
+    @apply text-xl md:text-2xl font-medium uppercase tracking-wide;
+  }
+
+  p {
+    @apply text-base md:text-lg leading-relaxed text-text-secondary;
+  }
+
+  a {
+    @apply text-copper-500 hover:text-copper-400 transition-colors duration-200;
+  }
+
+  blockquote {
+    @apply border-l-2 border-copper-500 pl-6 italic text-text-secondary my-8;
+  }
+
+  code {
+    @apply bg-charcoal-800 text-copper-500 px-1.5 py-0.5 rounded text-sm font-mono;
+  }
+
+  pre {
+    @apply bg-charcoal-800 p-4 rounded-lg overflow-x-auto my-4;
+  }
+
+  pre code {
+    @apply bg-transparent p-0 text-text-secondary;
+  }
+
+  hr {
+    @apply border-copper-500/30 my-8;
+  }
+
+  * {
+    @apply border-copper-700/20;
+  }
+
+  html {
+    @apply bg-background text-text-primary antialiased;
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-background text-text-primary min-h-screen;
+  }
+
+  ::selection {
+    @apply bg-copper-500/30 text-text-primary;
+  }
+
+  ::-webkit-scrollbar {
+    @apply w-2;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-charcoal-900;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-charcoal-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-charcoal-500;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-copper-500;
+  }
+}
+
+/* ===== Components ===== */
+@layer components {
+  .copper-text {
+    @apply text-copper-500;
+  }
+
+  .copper-link {
+    @apply text-copper-500 hover:text-copper-400 transition-colors duration-200;
+  }
+
+  .surface-card {
+    @apply bg-charcoal-800 border border-copper-500/20 rounded-lg;
+  }
+
+  .glass-panel {
+    @apply bg-charcoal-900/80 backdrop-blur-md border-b border-charcoal-700;
+  }
+}
+
+/* ===== Utilities ===== */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* ===== Prose for manifesto and journal content ===== */
+.prose-n8g {
+  @apply max-w-prose mx-auto;
+}
+
+.prose-n8g h1 {
+  @apply font-sans text-copper-500 mb-8;
+}
+
+.prose-n8g h2 {
+  @apply font-sans text-copper-500 mt-12 mb-6;
+}
+
+.prose-n8g h3 {
+  @apply font-sans text-copper-500 mt-8 mb-4;
+}
+
+.prose-n8g p {
+  @apply mb-6 leading-relaxed;
+}
+
+.prose-n8g ul {
+  @apply list-disc list-inside mb-6 text-text-secondary space-y-2;
+}
+
+.prose-n8g ol {
+  @apply list-decimal list-inside mb-6 text-text-secondary space-y-2;
+}
+
+.prose-n8g li {
+  @apply leading-relaxed;
+}
+
+.prose-n8g strong {
+  @apply text-text-primary font-semibold;
+}
+
+.prose-n8g em {
+  @apply text-copper-500 not-italic;
+}
+
+.prose-n8g blockquote {
+  @apply border-l-2 border-copper-500 pl-6 italic text-stone-400 my-8;
+}
