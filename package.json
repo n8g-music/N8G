@@ -1,0 +1,21 @@
+{
+  "name": "n8g-creative-os",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "sync": "bun run drive-sync/sync-main.ts",
+    "sync:watch": "bun run drive-sync/watcher.ts",
+    "sync:dry": "bun run drive-sync/sync-main.ts --dry-run"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "googleapis": "^173.0.0",
+    "sharp": "^0.35.3"
+  }
+}

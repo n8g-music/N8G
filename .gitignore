@@ -13,6 +13,10 @@ build/
 # Runtime
 .run/
 
+# Drive Sync
+drive-credentials.json
+drive-sync/.sync-state.json
+
 # Logs
 *.log
 
