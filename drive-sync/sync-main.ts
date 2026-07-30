@@ -1,11 +1,9 @@
 /**
- * N8G Drive Sync — Main Orchestrator
+ * N8G Drive Sync — Main Orchestrator (Git-native)
  *
- * Core sync logic:
- * 1. Scan all mapped Drive folders
- * 2. Detect new/changed files since last sync
- * 3. Download and route to correct processor
- * 4. Batch commit and push changes
+ * Scans the `drive/` folder for new files dropped by the owner via git,
+ * routes them to the correct processor, then cleans up processed sources
+ * and commits the result.
  *
  * Usage:
  *   bun run drive-sync/sync-main.ts               # Full sync
@@ -15,22 +13,10 @@
 
 import * as fs from "fs";
 import * as path from "path";
-import { FOLDER_MAP, BIDIRECTIONAL_FOLDERS, classifyFile } from "./config";
-import {
-  getDriveClient,
-  listFilesInFolder,
-  downloadFile,
-  loadSyncState,
-  findChangedFiles,
-  updateSyncState,
-  SyncState,
-} from "./utils/drive-client";
+import { DRIVE_ROOT, FOLDER_MAP, BIDIRECTIONAL_FOLDERS, classifyFile } from "./config";
 import { processImage } from "./processors/images";
-import { processAudioFile, processAlbumDirectory } from "./processors/audio";
-import {
-  processDocument,
-  handleBidirectionalConflict,
-} from "./processors/documents";
+import { processAudioFile } from "./processors/audio";
+import { processDocument, handleBidirectionalConflict } from "./processors/documents";
 import { fullSyncCommit } from "./utils/git-helpers";
 
 function log(message: string) {
@@ -39,88 +25,54 @@ function log(message: string) {
 }
 
 /**
- * Run a full sync pass: check all mapped folders, download new files,
- * route to processors, and commit.
+ * Run a full sync pass: scan drive/ folders, process files, clean up, commit.
  */
 export async function runFullSync(dryRun: boolean = false): Promise<void> {
-  const state = loadSyncState();
-  const drive = await getDriveClient();
-
-  if (!drive) {
-    log("Drive client not available — skipping sync");
-    log("Place service account credentials at: /home/team/shared/drive-credentials.json");
-    log("See drive-sync/SETUP.md for instructions");
+  if (!fs.existsSync(DRIVE_ROOT)) {
+    log(`drive/ folder not found at ${DRIVE_ROOT} — nothing to sync`);
+    log("Create it and add subfolders matching the mapped names, then commit.");
     return;
   }
 
   let totalProcessed = 0;
 
   for (const [folderName, localPath] of Object.entries(FOLDER_MAP)) {
-    log(`Scanning Drive folder: "${folderName}"`);
+    const driveFolder = path.join(DRIVE_ROOT, folderName);
 
-    try {
-      const { files } = await listFilesInFolder(folderName);
-      const changed = findChangedFiles(files, folderName, state);
+    if (!fs.existsSync(driveFolder)) continue;
 
-      if (changed.length === 0) {
-        log(`  No new files in "${folderName}"`);
-        updateSyncState(folderName, state);
+    const files = fs.readdirSync(driveFolder, { withFileTypes: true });
+
+    if (files.length === 0) continue;
+
+    log(`Scanning drive/${folderName}/ — ${files.length} item(s)`);
+
+    for (const entry of files) {
+      // Skip marker files
+      if (entry.name === ".gitkeep") continue;
+
+      // Handle subdirectories (e.g. album folders with tracks inside)
+      if (entry.isDirectory()) {
+        const albumDir = path.join(driveFolder, entry.name);
+        const subEntries = fs.readdirSync(albumDir, { withFileTypes: true });
+        for (const sub of subEntries) {
+          if (!sub.isFile()) continue;
+          if (sub.name === ".gitkeep") continue;
+          const inputPath = path.join(albumDir, sub.name);
+          await processFile(sub.name, inputPath, folderName, localPath, entry.name, dryRun);
+          totalProcessed++;
+        }
+        // Remove album dir after processing
+        if (!dryRun) {
+          fs.rmSync(albumDir, { recursive: true, force: true });
+        }
         continue;
       }
 
-      log(`  Found ${changed.length} new/changed file(s) in "${folderName}"`);
-
-      for (const file of changed) {
-        if (!file.id || !file.name) continue;
-
-        const type = classifyFile(file.name);
-        const localFilePath = path.join(localPath, file.name);
-
-        if (BIDIRECTIONAL_FOLDERS.has(folderName)) {
-          // For bidirectional folders, check for conflicts before downloading
-          const conflict = handleBidirectionalConflict(
-            localFilePath,
-            localFilePath, // placeholder — will be replaced after download
-            dryRun
-          );
-          if (conflict === "local-kept") continue;
-        }
-
-        try {
-          // Download the file
-          if (!dryRun) {
-            await downloadFile(file.id, localFilePath);
-          } else {
-            log(`  [DRY RUN] Would download: ${file.name} → ${localFilePath}`);
-          }
-
-          // Route to processor
-          switch (type) {
-            case "image":
-              await processImage(localFilePath, localPath, dryRun);
-              break;
-            case "audio":
-              processAudioFile(localFilePath, path.join(localPath, "..", "lyrics"), "", dryRun);
-              break;
-            case "document":
-              processDocument(localFilePath, localPath, dryRun);
-              break;
-            case "video":
-              log(`  Video file (stored as-is): ${file.name}`);
-              break;
-            default:
-              log(`  Unknown file type, stored as-is: ${file.name}`);
-          }
-
-          totalProcessed++;
-        } catch (err: any) {
-          log(`  ERROR processing ${file.name}: ${err.message}`);
-        }
-      }
-
-      updateSyncState(folderName, state);
-    } catch (err: any) {
-      log(`  ERROR scanning "${folderName}": ${err.message}`);
+      // Regular file
+      const inputPath = path.join(driveFolder, entry.name);
+      await processFile(entry.name, inputPath, folderName, localPath, "", dryRun);
+      totalProcessed++;
     }
   }
 
@@ -130,12 +82,73 @@ export async function runFullSync(dryRun: boolean = false): Promise<void> {
   fullSyncCommit(dryRun);
 }
 
+/**
+ * Route a single file to the correct processor, then clean up the source.
+ */
+async function processFile(
+  filename: string,
+  inputPath: string,
+  folderName: string,
+  localPath: string,
+  albumName: string,
+  dryRun: boolean
+): Promise<void> {
+  const type = classifyFile(filename);
+
+  // Bidirectional conflict check
+  if (BIDIRECTIONAL_FOLDERS.has(folderName)) {
+    const localFilePath = path.join(localPath, filename);
+    if (fs.existsSync(localFilePath)) {
+      const conflict = handleBidirectionalConflict(localFilePath, inputPath, dryRun);
+      if (conflict === "local-kept") {
+        // Still clean up the drive source
+        if (!dryRun) fs.unlinkSync(inputPath);
+        return;
+      }
+    }
+  }
+
+  try {
+    switch (type) {
+      case "image":
+        await processImage(inputPath, localPath, dryRun);
+        break;
+      case "audio":
+        processAudioFile(inputPath, path.join(localPath, "..", "lyrics"), albumName, dryRun);
+        break;
+      case "document":
+        processDocument(inputPath, localPath, dryRun);
+        break;
+      case "video":
+        if (!dryRun) {
+          fs.mkdirSync(localPath, { recursive: true });
+          fs.copyFileSync(inputPath, path.join(localPath, filename));
+        }
+        log(`  Video file (copied as-is): ${filename}`);
+        break;
+      default:
+        if (!dryRun) {
+          fs.mkdirSync(localPath, { recursive: true });
+          fs.copyFileSync(inputPath, path.join(localPath, filename));
+        }
+        log(`  Unknown file type, copied as-is: ${filename}`);
+    }
+
+    // Clean up the source file from drive/ after processing
+    if (!dryRun && fs.existsSync(inputPath)) {
+      fs.unlinkSync(inputPath);
+    }
+  } catch (err: any) {
+    log(`  ERROR processing ${filename}: ${err.message}`);
+  }
+}
+
 // CLI entry point
 async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes("--dry-run");
 
-  log(`N8G Drive Sync — starting${dryRun ? " (DRY RUN)" : ""}`);
+  log(`N8G Drive Sync (git-native) — starting${dryRun ? " (DRY RUN)" : ""}`);
 
   try {
     await runFullSync(dryRun);
@@ -146,8 +159,8 @@ async function main() {
 }
 
 // If run directly (not imported by watcher)
-const isMain = import.meta.url.endsWith(process.argv[1]?.split("/").pop() || "");
-if (isMain || process.argv[1]?.includes("sync-main")) {
+const scriptName = process.argv[1]?.split("/").pop() || "";
+if (scriptName === "sync-main.ts" || process.argv[1]?.includes("sync-main")) {
   main().catch((err) => {
     log(`Fatal error: ${err.message}`);
     process.exit(1);

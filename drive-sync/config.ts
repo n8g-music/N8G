@@ -1,8 +1,9 @@
 /**
  * N8G Drive Sync — Configuration
  *
- * Maps Google Drive folders to local filesystem paths.
- * Controls polling intervals, processing rules, and sync behavior.
+ * Git-native pipeline: the owner drops files into `drive/` folders
+ * and commits to the repo. The watcher detects new commits and
+ * processes them automatically.
  */
 
 import * as path from "path";
@@ -10,35 +11,33 @@ import * as path from "path";
 export const ROOT = path.resolve(import.meta.dir, "..");
 
 export const POLL_INTERVAL_MS = 60_000; // 60 seconds
-export const BATCH_WINDOW_MS = 30_000; // group changes within 30s into one commit
+export const BATCH_WINDOW_MS = 30_000;  // group changes within 30s into one commit
 
-export const CREDENTIALS_PATH = path.join(ROOT, "drive-credentials.json");
-export const SYNC_STATE_PATH = path.join(
-  import.meta.dir,
-  ".sync-state.json"
-);
-export const LOG_PATH = path.join(ROOT, ".run", "drive-sync.log");
+export const LOG_PATH = path.join(ROOT, ".run", "git-watcher.log");
+
+/** Root of the incoming drive/ folder (dropped by owner via git). */
+export const DRIVE_ROOT = path.join(ROOT, "drive");
 
 /**
- * Drive folder → local filesystem mapping.
- * Keys are folder names inside the shared Drive.
+ * Drive folder → local output mapping.
+ * Files dropped into `drive/<key>` are processed and output to the matching local path.
  */
 export const FOLDER_MAP: Record<string, string> = {
-  "Albums": path.join(ROOT, "content", "music", "releases"),
-  "Artwork": path.join(ROOT, "public", "images", "gallery"),
-  "Photography": path.join(ROOT, "public", "images", "photography"),
-  "Videos": path.join(ROOT, "public", "videos"),
-  "Lyrics": path.join(ROOT, "content", "music", "lyrics"),
-  "Documents": path.join(ROOT, "content", "journal"),
-  "Brand Bible": path.join(ROOT, "brand"),
+  "Albums":          path.join(ROOT, "content", "music", "releases"),
+  "Artwork":         path.join(ROOT, "public", "images", "gallery"),
+  "Photography":     path.join(ROOT, "public", "images", "photography"),
+  "Videos":          path.join(ROOT, "public", "videos"),
+  "Lyrics":          path.join(ROOT, "content", "music", "lyrics"),
+  "Documents":       path.join(ROOT, "content", "journal"),
+  "Brand Bible":     path.join(ROOT, "brand"),
   "Character Bible": path.join(ROOT, "brand", "characters"),
-  "Stage Bible": path.join(ROOT, "brand", "stage"),
-  "Press Kit": path.join(ROOT, "content", "press"),
+  "Stage Bible":     path.join(ROOT, "brand", "stage"),
+  "Press Kit":       path.join(ROOT, "content", "press"),
 };
 
 /**
- * Which folders to treat as bidirectional sync.
- * "Brand Bible" is bidirectional with caution — conflicts preserve local copy.
+ * Which folders are bidirectional (local edits may conflict with incoming).
+ * Brand Bible is bidirectional — local changes should be preserved if they differ.
  */
 export const BIDIRECTIONAL_FOLDERS = new Set(["Brand Bible"]);
 
@@ -65,13 +64,4 @@ export function classifyFile(filename: string): "image" | "audio" | "document" |
   if (DOCUMENT_EXTENSIONS.has(ext)) return "document";
   if (VIDEO_EXTENSIONS.has(ext)) return "video";
   return "unknown";
-}
-
-export interface SyncStateFile {
-  lastChecked: string; // ISO timestamp
-  lastPageToken?: string;
-}
-
-export interface SyncState {
-  [folderName: string]: SyncStateFile;
 }

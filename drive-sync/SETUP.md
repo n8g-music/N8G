@@ -1,95 +1,66 @@
-# N8G Drive Sync — Setup Guide
+# N8G Drive Sync — Setup Guide (Git-Native)
 
-How to connect the N8G Google Drive to the autonomous creative OS.
+How the owner drops files into the repo and the autonomous creative OS processes them automatically.
 
 ## Overview
 
-The Drive Sync pipeline watches a shared Google Drive for new or changed files and automatically:
+The Drive Sync pipeline watches the `drive/` folder in the N8G repo for new files and automatically:
 
-- Downloads them to the correct local directory
+- Detects new commits touching `drive/`
 - Processes images (resize, convert to WebP, strip metadata)
 - Reads audio metadata and generates markdown + JSON
 - Copies documents to content directories
+- Cleans up processed source files from `drive/`
 - Commits everything and pushes to GitHub (which triggers the site rebuild)
 
-## Prerequisites — Google Cloud Setup
+**No Google Cloud setup required.** The owner just drops files into `drive/`, commits, and pushes.
 
-You (the owner) need to:
+## How the owner uses it
 
-### 1. Create a Google Cloud Project
+### Dropping files
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (or use an existing one)
-3. Note the project ID
+1. Place files into the matching `drive/` subfolder (see table below)
+2. Commit and push to `main`:
+   ```bash
+   git add drive/
+   git commit -m "Add new artwork and tracks"
+   git push origin main
+   ```
+3. Within 60 seconds, the git-native watcher detects the commit, pulls, processes everything, and publishes the results
 
-### 2. Enable the Drive API
+That's it. No Google Drive, no service accounts, no API keys.
 
-1. Go to **APIs & Services → Library**
-2. Search for "Google Drive API"
-3. Click **Enable**
+### Folder map
 
-### 3. Create a Service Account
-
-1. Go to **APIs & Services → Credentials**
-2. Click **Create Credentials → Service Account**
-3. Give it a name like `n8g-drive-sync`
-4. Skip the optional role assignments
-5. Click **Done**
-
-### 4. Download the Service Account Key
-
-1. In the Credentials page, click on the service account you created
-2. Go to the **Keys** tab
-3. Click **Add Key → Create New Key → JSON**
-4. Download the JSON file
-
-### 5. Place the Credentials File
-
-Copy the downloaded JSON file to:
-
-```
-/home/team/shared/drive-credentials.json
-```
-
-### 6. Share Your Drive Folders
-
-1. Open the downloaded JSON file and find the `client_email` field (looks like `n8g-drive-sync@project-id.iam.gserviceaccount.com`)
-2. In Google Drive, share each folder you want synced with that email address
-3. Give it **Viewer** access (read-only is sufficient for syncing)
-
-The folders must be named exactly as follows in your Drive root:
-
-| Folder Name    | What Goes In            |
-|----------------|-------------------------|
-| `Albums`       | Mastered tracks         |
-| `Artwork`      | Album art, posters      |
-| `Photography`  | Photoshoot images       |
-| `Videos`       | Performance videos      |
-| `Lyrics`       | Track lyrics            |
-| `Documents`    | Creative notes, releases|
-| `Brand Bible`  | Brand documents         |
-| `Character Bible`| Character documents   |
-| `Stage Bible`  | Stage design documents  |
-| `Press Kit`    | Press materials         |
+| drive/ Folder      | What to drop here              | Output goes to                  |
+|--------------------|--------------------------------|---------------------------------|
+| `Albums/`          | Mastered tracks (any format)   | `content/music/releases/`       |
+| `Artwork/`         | Album art, posters, visuals    | `public/images/gallery/`        |
+| `Photography/`     | Photoshoot images              | `public/images/photography/`    |
+| `Videos/`          | Performance videos             | `public/videos/`                |
+| `Lyrics/`          | Lyric files (.txt, .md)        | `content/music/lyrics/`         |
+| `Documents/`       | Creative notes, press releases | `content/journal/`              |
+| `Brand Bible/`     | Brand document updates         | `brand/`                        |
+| `Character Bible/` | Character updates              | `brand/characters/`             |
+| `Stage Bible/`     | Stage design documents         | `brand/stage/`                  |
+| `Press Kit/`       | Press materials                | `content/press/`                |
 
 ## Testing — Dry Run
 
-Before connecting real credentials, you can test the pipeline:
+Test the pipeline without making any changes:
 
 ```bash
 cd /home/team/shared
 bun run sync:dry
 ```
 
-With credentials in place, `--dry-run` shows what *would* happen without actually downloading or committing:
+This scans `drive/`, shows what *would* happen, but doesn't modify anything.
+
+### Test the Image Processor (no files needed)
 
 ```bash
-bun run drive-sync/sync-main.ts --dry-run
-```
+cd /home/team/shared
 
-### Test the Image Processor (no credentials needed)
-
-```bash
 # Create a test image
 bun -e "
 import sharp from 'sharp';
@@ -106,6 +77,25 @@ console.log('Done — check /tmp/test-output/');
 "
 ```
 
+### End-to-end test
+
+```bash
+# Create a test file in drive/Artwork/
+bun -e "
+import sharp from 'sharp';
+await sharp({ create: { width: 1200, height: 800, channels: 3, background: '#1a1a2e' } })
+  .jpeg()
+  .toFile('./drive/Artwork/test-image.jpg');
+"
+
+# Run the sync
+bun run sync
+
+# Check that the image was processed and cleaned up
+ls public/images/gallery/
+ls drive/Artwork/   # Should be empty
+```
+
 ## Running the Sync
 
 ### One-time sync
@@ -115,13 +105,13 @@ cd /home/team/shared
 bun run sync
 ```
 
-This does one full scan of all Drive folders, downloads new files, processes them, and commits.
+This scans `drive/`, processes all files, and commits.
 
 ### Continuous watcher (background daemon)
 
 ```bash
 cd /home/team/shared
-./scripts/start-drive-sync.sh
+./scripts/start-git-watcher.sh
 ```
 
 This starts the watcher process that polls every 60 seconds. It survives terminal logout.
@@ -129,34 +119,40 @@ This starts the watcher process that polls every 60 seconds. It survives termina
 ### Stop the watcher
 
 ```bash
-kill $(cat /home/team/shared/.run/drive-sync.pid)
+kill $(cat /home/team/shared/.run/git-watcher.pid)
 ```
 
 ### Check the logs
 
 ```bash
-tail -f /home/team/shared/.run/drive-sync.log
+tail -f /home/team/shared/.run/git-watcher.log
 ```
 
 ## How It Works
 
 ```
-Drive folder "Artwork/"
+Owner drops files into drive/
        │
        ▼
-[watcher.ts] polls every 60s
+Owner commits & pushes to main
        │
        ▼
-[sync-main.ts] detects new/changed files
+[watcher.ts] polls origin/main every 60s
        │
        ▼
-[drive-client.ts] downloads files
+git fetch → git diff HEAD..origin/main --name-only -- drive/
+       │
+       ▼
+If changes: git pull → [sync-main.ts] scans drive/
        │
        ▼
 [processors/] routes by file type:
   ├── images.ts    → sharp resize, WebP, strip EXIF
   ├── audio.ts     → ffprobe metadata, markdown gen
   └── documents.ts → copy to content dirs
+       │
+       ▼
+Source files deleted from drive/ (processed)
        │
        ▼
 [git-helpers.ts]  → stage, commit, push
@@ -180,19 +176,32 @@ Drive folder "Artwork/"
 
 ### Documents
 - Markdown: copied as-is
-- PDFs: stored in `public/documents/`
-- Google Docs: stored as-is (markdown export requires additional API scope — let the team know if you need this)
+- PDFs: stored in output directory
+- DOCX: stored as-is (markdown conversion planned)
 
-### Brand Bible (Bidirectional Sync)
-The Brand Bible folder syncs both ways with caution. If a file exists both locally and in Drive and they differ, the local copy is preserved and the Drive version is backed up to `{filename}.drive-backup` for manual review.
+### Brand Bible (Bidirectional)
+The Brand Bible folder syncs with caution. If a file exists both locally and in `drive/Brand Bible/` and they differ, the local copy is preserved and the incoming version is backed up to `{filename}.drive-backup` for manual review.
+
+## Directory Structure
+
+```
+drive-sync/
+├── config.ts              # Folder mappings, polling interval
+├── sync-main.ts           # Main orchestrator (scans drive/)
+├── watcher.ts             # Git-native polling daemon
+├── SETUP.md               # This file
+├── processors/
+│   ├── images.ts          # Image resize + WebP
+│   ├── audio.ts           # Audio metadata + markdown
+│   └── documents.ts       # Document routing
+└── utils/
+    └── git-helpers.ts     # Stage, commit, push
+```
 
 ## Troubleshooting
 
-**"Credentials file not found"**
-→ You haven't placed the service account JSON at `/home/team/shared/drive-credentials.json` yet. Follow step 5 above.
-
-**"Folder not found in Drive"**
-→ Either the folder doesn't exist in the shared Drive, or the service account email hasn't been given access. Check step 6.
+**"drive/ folder not found"**
+→ The `drive/` directory structure hasn't been created yet. It should exist at the repo root with all subfolders. The watcher creates it if needed, but you can also run `mkdir -p drive/{Albums,Artwork,Photography,Videos,Lyrics,Documents,"Brand Bible","Character Bible","Stage Bible","Press Kit"}`.
 
 **Git push fails**
 → Run `get_git_credentials` to refresh the GitHub token, then retry.
@@ -200,18 +209,5 @@ The Brand Bible folder syncs both ways with caution. If a file exists both local
 **Images not processing**
 → Make sure `sharp` is installed: `cd /home/team/shared && bun install`
 
-## Directory Structure
-
-```
-drive-sync/
-├── config.ts              # Folder mappings, polling interval
-├── sync-main.ts           # Main orchestrator
-├── watcher.ts             # Polling daemon
-├── processors/
-│   ├── images.ts          # Image resize + WebP
-│   ├── audio.ts           # Audio metadata + markdown
-│   └── documents.ts       # Document routing
-└── utils/
-    ├── drive-client.ts    # Google Drive API wrapper
-    └── git-helpers.ts     # Stage, commit, push
-```
+**Watcher not detecting changes**
+→ Check logs: `tail -f .run/git-watcher.log`. Ensure the watcher is running: `cat .run/git-watcher.pid`. Ensure the commits are on `main` and the watcher can fetch.
